@@ -1,0 +1,49 @@
+name: Request
+on:
+  issues:
+    types:
+      - opened
+  issue_comment:
+    types:
+      - created
+env:
+  TZ: 'Asia/Tokyo'
+jobs:
+  register:
+    runs-on: ubuntu-24.04
+    if: |
+      contains(github.event.issue.labels.*.name, 'registration') && (
+        (github.event_name == 'issues') || (
+          github.event_name == 'issue_comment' &&
+          !github.event.issue.pull_request &&
+          startsWith(github.event.comment.body, '/retry') &&
+          (github.actor == github.event.issue.user.login)
+        )
+      )
+    steps:
+      - if: github.event_name == 'issues'
+        run: |
+          gh api -X POST repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/reactions -f content=+1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: github.event_name == 'issue_comment'
+        run: |
+          gh api -X POST repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions -f content=+1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # renovate: tag=v4.2.2
+        with:
+          repository: CyberAgentHack/web-speed-hackathon-2025-scoring-tool-workspace
+          ssh-key: ${{ secrets.SSH_KEY }}
+      - run: |
+          curl https://mise.run | sh
+          echo "$HOME/.local/share/mise/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
+          mise install
+        env:
+          MISE_VERSION: '2025.3.2'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run start
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TZ: 'Asia/Tokyo'
